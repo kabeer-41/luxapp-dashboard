@@ -66,15 +66,16 @@
 
     <script>
         // --- SECURE CONFIGURATION ---
-        const MQTT_HOST = "io.adafruit.com";
-        const MQTT_PORT = 443;
-        const MQTT_USER = "kabeer41"; 
-        
-        // This MUST match the 'Device Topic' in your WLED settings.
-        const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxlamp`; 
-        
-        // WLED strictly looks for JSON commands on the /api sub-topic.
-        const COMMAND_TOPIC = WLED_DEVICE_TOPIC + "/api";
+        // --- SECURE CONFIGURATION ---
+    const MQTT_HOST = "io.adafruit.com";
+    const MQTT_PORT = 443;
+    const MQTT_USER = "kabeer41"; 
+    
+    // 1. UPDATE THIS LINE to match your screenshot perfectly:
+    const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxapp`; 
+    
+    // 2. KEEP THIS LINE (This is the secret sauce that makes the JSON work!)
+    const COMMAND_TOPIC = WLED_DEVICE_TOPIC + "/api";
 
         let mqttClient;
         let MQTT_PASS = localStorage.getItem("lux_key");
