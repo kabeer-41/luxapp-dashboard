@@ -59,41 +59,42 @@
             </div>
 
             <button class="lux-btn-mode" style="width: 100%; border-color: var(--accent); color: var(--accent); margin-top: 20px;" onclick="luxToggleLamp()">POWER TOGGLE</button>
+            
             <button class="lux-btn-mode" style="width: 100%; border:none; color: #666; font-size: 10px; margin-top: 10px;" onclick="resetKey()">Reset Access Key</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- SECURE CONFIGURATION ---
         const MQTT_HOST = "io.adafruit.com";
-        const MQTT_PORT = 443; // Secure WebSockets
+        const MQTT_PORT = 443;
         const MQTT_USER = "kabeer41"; 
-        const FEED_NAME = "api";
-        const LAMP_TOPIC = `${MQTT_USER}/feeds/${FEED_NAME}`;
+        
+        // This MUST match the 'Device Topic' in your WLED settings.
+        const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxlamp`; 
+        
+        // WLED strictly looks for JSON commands on the /api sub-topic.
+        const COMMAND_TOPIC = WLED_DEVICE_TOPIC + "/api";
 
         let mqttClient;
         let MQTT_PASS = localStorage.getItem("lux_key");
 
         function initMQTT() {
+            // Ask for the key if it's not saved in the browser
             if (!MQTT_PASS) {
-                MQTT_PASS = prompt("Please enter your LuxLights Access Key:");
+                MQTT_PASS = prompt("Welcome to LuxLights! Please enter your Access Key:");
                 if (MQTT_PASS) {
                     localStorage.setItem("lux_key", MQTT_PASS);
                 } else {
-                    document.getElementById('status-bar').innerHTML = "Access Key Required";
+                    document.getElementById('status-bar').innerHTML = "Access Key Required to Connect";
+                    document.getElementById('status-bar').style.color = "#ff4d4d";
                     return;
                 }
             }
 
+            // Generate a random Client ID so your phone and lamp don't kick each other off
             const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
             mqttClient = new Paho.MQTT.Client(MQTT_HOST, Number(MQTT_PORT), clientId);
-
-            mqttClient.onMessageArrived = (msg) => {
-                try {
-                    const status = JSON.parse(msg.payloadString);
-                    if (status.bri !== undefined) document.getElementById('lux-bri').value = status.bri;
-                } catch(e) { /* Adafruit sometimes sends raw values */ }
-            };
 
             mqttClient.connect({
                 useSSL: true, 
@@ -102,12 +103,18 @@
                 onSuccess: () => {
                     document.getElementById('status-bar').innerHTML = "● GLOBAL ACTIVE";
                     document.getElementById('status-bar').style.color = "#4ecca3";
-                    mqttClient.subscribe(LAMP_TOPIC);
+                    
+                    // We subscribe to the base topic just to monitor connection, 
+                    // but we will PUBLISH to the /api topic.
+                    mqttClient.subscribe(WLED_DEVICE_TOPIC); 
                 },
                 onFailure: (err) => { 
                     document.getElementById('status-bar').innerHTML = "○ Connection Failed - Check Key"; 
                     document.getElementById('status-bar').style.color = "#ff4d4d";
-                    console.log(err);
+                    console.log("MQTT Connection Error:", err);
+                    
+                    // Clear the bad key so the user can try again on refresh
+                    localStorage.removeItem("lux_key");
                 }
             });
         }
@@ -115,16 +122,26 @@
         function luxPostData(data) {
             if (mqttClient && mqttClient.isConnected()) {
                 const message = new Paho.MQTT.Message(JSON.stringify(data));
-                message.destinationName = LAMP_TOPIC;
+                
+                // THE CRITICAL FIX: Sending strictly to the /api mailbox
+                message.destinationName = COMMAND_TOPIC; 
+                
                 mqttClient.send(message);
             }
         }
 
-        function luxToggleLamp() { luxPostData({ on: "t", transition: 7 }); }
-        function luxSetBrightness(v) { luxPostData({ bri: parseInt(v), transition: 7 }); }
+        // --- LAMP COMMANDS ---
+        function luxToggleLamp() { 
+            luxPostData({ "on": "t", "transition": 7 }); 
+        }
+        
+        function luxSetBrightness(v) { 
+            luxPostData({ "bri": parseInt(v), "transition": 7 }); 
+        }
         
         function luxSetColor(r, g, b) { 
-            luxPostData({ on: true, seg: [{ col: [[r, g, b]] }], transition: 7 }); 
+            luxPostData({ "on": true, "seg": [{ "col": [[r, g, b]] }], "transition": 7 }); 
+            // Update the UI background to match the lamp
             document.getElementById("luxapp-ui").style.background = `radial-gradient(circle at top, rgba(${r},${g},${b},0.15) 0%, #1a1a2e 100%)`;
         }
 
@@ -133,6 +150,7 @@
             location.reload();
         }
 
+        // Start connection when the page loads
         document.addEventListener("DOMContentLoaded", initMQTT);
     </script>
 </body>
