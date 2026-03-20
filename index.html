@@ -66,17 +66,17 @@
 
     <script>
         // --- SECURE CONFIGURATION ---
-        // --- SECURE CONFIGURATION ---
+// --- SECURE CONFIGURATION ---
     const MQTT_HOST = "io.adafruit.com";
     const MQTT_PORT = 443;
     const MQTT_USER = "kabeer41"; 
     
-    // 1. UPDATE THIS LINE to match your screenshot perfectly:
-    const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxapp`; 
+    // WLED's base topic using Adafruit's shorthand "f"
+    const WLED_DEVICE_TOPIC = `${MQTT_USER}/f`; 
     
-    // 2. KEEP THIS LINE (This is the secret sauce that makes the JSON work!)
-    const COMMAND_TOPIC = WLED_DEVICE_TOPIC + "/api";
-
+    // The exact topic we publish JSON to, which maps to the Adafruit "api" feed
+    const COMMAND_TOPIC = `${MQTT_USER}/f/api`;
+    
         let mqttClient;
         let MQTT_PASS = localStorage.getItem("lux_key");
 
