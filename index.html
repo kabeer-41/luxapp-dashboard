@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LuxApp Global Control</title>
+    <title>LuxLights Control</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     
     <style>
@@ -18,36 +18,38 @@
             padding: 30px 20px; display: flex; flex-direction: column; transition: background 0.8s ease;
         }
         .header { text-align: center; margin-bottom: 40px; }
-        .header h1 { margin: 0; font-size: 28px; letter-spacing: 2px; color: var(--accent); }
-        .lux-control-group { background: rgba(255,255,255,0.03); padding: 20px; border-radius: 15px; margin-bottom: 20px; }
-        label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; opacity: 0.6; }
+        .header h1 { margin: 0; font-size: 28px; letter-spacing: 2px; color: var(--accent); font-weight: 300; }
+        .lux-control-group { background: rgba(255,255,255,0.03); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; opacity: 0.6; }
         .lux-btn-mode {
             flex: 1; padding: 12px; border: 1px solid rgba(255,255,255,0.1); background: transparent;
             color: white; border-radius: 8px; font-size: 14px; cursor: pointer; transition: 0.3s;
         }
         .lux-btn-mode:active { transform: scale(0.95); background: rgba(255,255,255,0.05); }
         input[type=range] { width: 100%; height: 6px; border-radius: 5px; background: #333; outline: none; -webkit-appearance: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: var(--accent); border-radius: 50%; }
-        .color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .color-dot { height: 45px; border-radius: 10px; border: none; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: var(--accent); border-radius: 50%; border: 3px solid var(--bg); box-shadow: 0 0 10px rgba(78, 204, 163, 0.4); }
+        .color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .color-dot { height: 45px; border-radius: 12px; border: none; cursor: pointer; transition: 0.2s; }
+        .color-dot:active { transform: scale(0.9); }
+        #status-bar { font-size: 10px; margin-top: 10px; opacity: 0.7; letter-spacing: 1px; }
     </style>
 </head>
 <body>
 
     <div id="luxapp-ui">
         <div class="header">
-            <h1>LUXAPP</h1>
-            <p id="conn-status" style="font-size: 10px; opacity: 0.5;">Connecting to Cloud...</p>
+            <h1>LUXLIGHTS</h1>
+            <div id="status-bar">Connecting to Global Bridge...</div>
         </div>
 
         <div id="lux-main-view">
             <div class="lux-control-group">
-                <label>Intensity</label>
-                <input type="range" id="lux-bri" min="0" max="255" oninput="luxSetBrightness(this.value)">
+                <label>Brightness</label>
+                <input type="range" id="lux-bri" min="0" max="255" value="128" oninput="luxSetBrightness(this.value)">
             </div>
 
             <div class="lux-control-group">
-                <label>Quick Colors</label>
+                <label>Quick Scenes</label>
                 <div class="color-grid">
                     <button class="color-dot" style="background: #ff4d4d;" onclick="luxSetColor(255,0,0)"></button>
                     <button class="color-dot" style="background: #4dff88;" onclick="luxSetColor(0,255,0)"></button>
@@ -56,59 +58,64 @@
                 </div>
             </div>
 
-            <div class="lux-control-group">
-                <label>Sleep Timer</label>
-                <div style="display: flex; gap: 8px;">
-                    <select id="timer-h" class="lux-btn-mode"><option value="0">0h</option><option value="1">1h</option><option value="4">4h</option></select>
-                    <select id="timer-m" class="lux-btn-mode"><option value="0.17">10s</option><option value="5">5m</option><option value="30">30m</option></select>
-                    <button class="lux-btn-mode" style="background: #af52de22; color: #af52de;" onclick="luxStartTimer()">Set</button>
-                </div>
-                <p id="timer-status" style="font-size: 11px; margin-top: 10px; text-align: center; color: var(--accent);"></p>
-            </div>
-
-            <button class="lux-btn-mode" style="width: 100%; border-color: var(--accent); color: var(--accent);" onclick="luxToggleLamp()">Toggle Power</button>
+            <button class="lux-btn-mode" style="width: 100%; border-color: var(--accent); color: var(--accent); margin-top: 20px;" onclick="luxToggleLamp()">POWER TOGGLE</button>
+            <button class="lux-btn-mode" style="width: 100%; border:none; color: #666; font-size: 10px; margin-top: 10px;" onclick="resetKey()">Reset Access Key</button>
         </div>
     </div>
 
     <script>
-        // --- MQTT CONFIGURATION (Replace with your HiveMQ details) ---
-       // --- ADAFRUIT IO CONFIGURATION ---
-const MQTT_HOST = "io.adafruit.com"; 
-const MQTT_PORT = 443; // Adafruit Secure WebSocket Port
-const MQTT_USER = "kabeer41";
-const MQTT_PASS = "aio_UyYr15S427AcpnHA8hN4J668Gawh";
-const LAMP_TOPIC = "kabeer41/feeds/luxapp"; // Must match the hardware topic
+        // --- CONFIGURATION ---
+        const MQTT_HOST = "io.adafruit.com";
+        const MQTT_PORT = 443; // Secure WebSockets
+        const MQTT_USER = "kabeer41"; 
+        const FEED_NAME = "luxapp";
+        const LAMP_TOPIC = `${MQTT_USER}/feeds/${FEED_NAME}`;
 
         let mqttClient;
+        let MQTT_PASS = localStorage.getItem("lux_key");
 
         function initMQTT() {
-            const clientId = "LuxApp_Web_" + Math.random().toString(16).substr(2, 8);
+            if (!MQTT_PASS) {
+                MQTT_PASS = prompt("Please enter your LuxLights Access Key:");
+                if (MQTT_PASS) {
+                    localStorage.setItem("lux_key", MQTT_PASS);
+                } else {
+                    document.getElementById('status-bar').innerHTML = "Access Key Required";
+                    return;
+                }
+            }
+
+            const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
             mqttClient = new Paho.MQTT.Client(MQTT_HOST, Number(MQTT_PORT), clientId);
 
             mqttClient.onMessageArrived = (msg) => {
-                const status = JSON.parse(msg.payloadString);
-                if (status.bri !== undefined) document.getElementById('lux-bri').value = status.bri;
-                if (status.nl && status.nl.on) {
-                    document.getElementById('timer-status').innerHTML = `⏳ Off in ${status.nl.rem} mins`;
-                } else {
-                    document.getElementById('timer-status').innerHTML = "";
-                }
+                try {
+                    const status = JSON.parse(msg.payloadString);
+                    if (status.bri !== undefined) document.getElementById('lux-bri').value = status.bri;
+                } catch(e) { /* Adafruit sometimes sends raw values */ }
             };
 
             mqttClient.connect({
-                useSSL: true, userName: MQTT_USER, password: MQTT_PASS,
+                useSSL: true, 
+                userName: MQTT_USER, 
+                password: MQTT_PASS,
                 onSuccess: () => {
-                    document.getElementById('conn-status').innerHTML = "● Online (Global)";
-                    mqttClient.subscribe(LAMP_TOPIC + "/status");
+                    document.getElementById('status-bar').innerHTML = "● GLOBAL ACTIVE";
+                    document.getElementById('status-bar').style.color = "#4ecca3";
+                    mqttClient.subscribe(LAMP_TOPIC);
                 },
-                onFailure: () => { document.getElementById('conn-status').innerHTML = "○ Offline - Retrying..."; setTimeout(initMQTT, 5000); }
+                onFailure: (err) => { 
+                    document.getElementById('status-bar').innerHTML = "○ Connection Failed - Check Key"; 
+                    document.getElementById('status-bar').style.color = "#ff4d4d";
+                    console.log(err);
+                }
             });
         }
 
         function luxPostData(data) {
             if (mqttClient && mqttClient.isConnected()) {
                 const message = new Paho.MQTT.Message(JSON.stringify(data));
-                message.destinationName = LAMP_TOPIC + "/api";
+                message.destinationName = LAMP_TOPIC;
                 mqttClient.send(message);
             }
         }
@@ -117,16 +124,13 @@ const LAMP_TOPIC = "kabeer41/feeds/luxapp"; // Must match the hardware topic
         function luxSetBrightness(v) { luxPostData({ bri: parseInt(v), transition: 7 }); }
         
         function luxSetColor(r, g, b) { 
-            luxPostData({ on: true, seg: [{ id: 0, fx: 0, col: [[r, g, b]] }], transition: 7 }); 
+            luxPostData({ on: true, seg: [{ col: [[r, g, b]] }], transition: 7 }); 
             document.getElementById("luxapp-ui").style.background = `radial-gradient(circle at top, rgba(${r},${g},${b},0.15) 0%, #1a1a2e 100%)`;
         }
 
-        function luxStartTimer() {
-            const h = parseInt(document.getElementById('timer-h').value);
-            const m = parseFloat(document.getElementById('timer-m').value);
-            const total = (h * 60) + m;
-            luxPostData({ nl: { on: true, dur: Math.round(total), tbri: 0, mode: 0 } });
-            document.getElementById('timer-status').innerHTML = "⏳ Timer Syncing...";
+        function resetKey() {
+            localStorage.removeItem("lux_key");
+            location.reload();
         }
 
         document.addEventListener("DOMContentLoaded", initMQTT);
