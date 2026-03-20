@@ -72,11 +72,12 @@
 
     <script>
         // --- MQTT CONFIGURATION (Replace with your HiveMQ details) ---
-        const MQTT_HOST = "63bb02813379412fabcc0bfbb1a7b231.s1.eu.hivemq.cloud"; 
-        const MQTT_PORT = 8884; // WebSocket Secure Port
-        const MQTT_USER = "admin";
-        const MQTT_PASS = "Adminlux1";
-        const LAMP_TOPIC = "luxapp/lamp01";
+       // --- ADAFRUIT IO CONFIGURATION ---
+const MQTT_HOST = "io.adafruit.com"; 
+const MQTT_PORT = 443; // Adafruit Secure WebSocket Port
+const MQTT_USER = "kabeer41";
+const MQTT_PASS = "aio_UyYr15S427AcpnHA8hN4J668Gawh";
+const LAMP_TOPIC = "kabeer41/feeds/luxapp"; // Must match the hardware topic
 
         let mqttClient;
 
