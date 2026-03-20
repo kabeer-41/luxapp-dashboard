@@ -66,15 +66,13 @@
 
     <script>
         // --- SECURE CONFIGURATION ---
-        const MQTT_HOST = "io.adafruit.com";
-        const MQTT_PORT = 443;
-        const MQTT_USER = "kabeer41"; 
-        
-        // Base topic for Power and Brightness
-        const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxapp`; 
+        const MQTT_HOST = "io.adafruit.com"; 
+const MQTT_PORT = 443; // Adafruit Secure WebSocket Port
+const MQTT_USER = "kabeer41";
+const MQTT_PASS = "aio_oosq90ZNIL16i18Ou7YXE2IUvndQ";
+const LAMP_TOPIC = "kabeer41/feeds/luxapp";
 
         let mqttClient;
-        let MQTT_PASS = localStorage.getItem("lux_key");
 
         function initMQTT() {
             if (!MQTT_PASS) {
