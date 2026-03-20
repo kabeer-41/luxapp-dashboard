@@ -45,7 +45,7 @@
         <div id="lux-main-view">
             <div class="lux-control-group">
                 <label>Brightness</label>
-                <input type="range" id="lux-bri" min="0" max="255" value="128" oninput="luxSetBrightness(this.value)">
+                <input type="range" id="lux-bri" min="0" max="255" value="128" onchange="luxSetBrightness(this.value)">
             </div>
 
             <div class="lux-control-group">
@@ -66,22 +66,17 @@
 
     <script>
         // --- SECURE CONFIGURATION ---
-// --- SECURE CONFIGURATION ---
-    const MQTT_HOST = "io.adafruit.com";
-    const MQTT_PORT = 443;
-    const MQTT_USER = "kabeer41"; 
-    
-    // WLED's base topic using Adafruit's shorthand "f"
-    const WLED_DEVICE_TOPIC = `${MQTT_USER}/f`; 
-    
-    // The exact topic we publish JSON to, which maps to the Adafruit "api" feed
-    const COMMAND_TOPIC = `${MQTT_USER}/f/api`;
-    
+        const MQTT_HOST = "io.adafruit.com";
+        const MQTT_PORT = 443;
+        const MQTT_USER = "kabeer41"; 
+        
+        // Base topic for Power and Brightness
+        const WLED_DEVICE_TOPIC = `${MQTT_USER}/feeds/luxapp`; 
+
         let mqttClient;
         let MQTT_PASS = localStorage.getItem("lux_key");
 
         function initMQTT() {
-            // Ask for the key if it's not saved in the browser
             if (!MQTT_PASS) {
                 MQTT_PASS = prompt("Welcome to LuxLights! Please enter your Access Key:");
                 if (MQTT_PASS) {
@@ -93,7 +88,6 @@
                 }
             }
 
-            // Generate a random Client ID so your phone and lamp don't kick each other off
             const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
             mqttClient = new Paho.MQTT.Client(MQTT_HOST, Number(MQTT_PORT), clientId);
 
@@ -102,47 +96,50 @@
                 userName: MQTT_USER, 
                 password: MQTT_PASS,
                 onSuccess: () => {
-                    document.getElementById('status-bar').innerHTML = "● GLOBAL ACTIVE";
+                    document.getElementById('status-bar').innerHTML = "● PLAIN TEXT GLOBAL ACTIVE";
                     document.getElementById('status-bar').style.color = "#4ecca3";
                     
-                    // We subscribe to the base topic just to monitor connection, 
-                    // but we will PUBLISH to the /api topic.
+                    // Subscribe to base topic to keep connection alive
                     mqttClient.subscribe(WLED_DEVICE_TOPIC); 
                 },
                 onFailure: (err) => { 
                     document.getElementById('status-bar').innerHTML = "○ Connection Failed - Check Key"; 
                     document.getElementById('status-bar').style.color = "#ff4d4d";
                     console.log("MQTT Connection Error:", err);
-                    
-                    // Clear the bad key so the user can try again on refresh
                     localStorage.removeItem("lux_key");
                 }
             });
         }
 
-        function luxPostData(data) {
+        function luxPostData(payload, specificTopic) {
             if (mqttClient && mqttClient.isConnected()) {
-                const message = new Paho.MQTT.Message(JSON.stringify(data));
-                
-                // THE CRITICAL FIX: Sending strictly to the /api mailbox
-                message.destinationName = COMMAND_TOPIC; 
-                
+                const message = new Paho.MQTT.Message(payload); // Sending RAW string, not JSON
+                message.destinationName = specificTopic;
                 mqttClient.send(message);
             }
         }
 
-        // --- LAMP COMMANDS ---
+        // --- PLAIN TEXT COMMANDS ---
+        
+        // Sends the letter "T" to toggle power
         function luxToggleLamp() { 
-            luxPostData({ "on": "t", "transition": 7 }); 
+            luxPostData("T", WLED_DEVICE_TOPIC); 
         }
         
+        // Sends a number string (0-255) for brightness
         function luxSetBrightness(v) { 
-            luxPostData({ "bri": parseInt(v), "transition": 7 }); 
+            luxPostData(v.toString(), WLED_DEVICE_TOPIC); 
         }
         
+        // Sends a HEX string (e.g., "#FF0000") to the /col sub-topic
         function luxSetColor(r, g, b) { 
-            luxPostData({ "on": true, "seg": [{ "col": [[r, g, b]] }], "transition": 7 }); 
-            // Update the UI background to match the lamp
+            // Convert RGB to HEX exactly as WLED expects it
+            const hex = "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+            
+            // Publish directly to the /col sub-topic
+            luxPostData(hex, WLED_DEVICE_TOPIC + "/col"); 
+            
+            // Update UI background to match
             document.getElementById("luxapp-ui").style.background = `radial-gradient(circle at top, rgba(${r},${g},${b},0.15) 0%, #1a1a2e 100%)`;
         }
 
