@@ -74,17 +74,17 @@ const LAMP_TOPIC = "kabeer41/feeds/luxapp";
 
         let mqttClient;
 
-        function initMQTT() {
-            if (!MQTT_PASS) {
-                MQTT_PASS = prompt("Welcome to LuxLights! Please enter your Access Key:");
-                if (MQTT_PASS) {
-                    localStorage.setItem("lux_key", MQTT_PASS);
-                } else {
-                    document.getElementById('status-bar').innerHTML = "Access Key Required to Connect";
-                    document.getElementById('status-bar').style.color = "#ff4d4d";
-                    return;
-                }
-            }
+        // function initMQTT() {
+        //     if (!MQTT_PASS) {
+        //         MQTT_PASS = prompt("Welcome to LuxLights! Please enter your Access Key:");
+        //         if (MQTT_PASS) {
+        //             localStorage.setItem("lux_key", MQTT_PASS);
+        //         } else {
+        //             document.getElementById('status-bar').innerHTML = "Access Key Required to Connect";
+        //             document.getElementById('status-bar').style.color = "#ff4d4d";
+        //             return;
+        //         }
+        //     }
 
             const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
             mqttClient = new Paho.MQTT.Client(MQTT_HOST, Number(MQTT_PORT), clientId);
