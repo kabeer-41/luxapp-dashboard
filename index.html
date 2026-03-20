@@ -3,104 +3,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LuxLights - Simple Toggle</title>
+    <title>LuxLights - Global Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
     
     <style>
+        :root { --bg: #1a1a2e; --panel: #16213e; --accent: #4ecca3; --text: #e9ecef; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
-            background-color: #1a1a2e; color: white; font-family: 'Segoe UI', sans-serif; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100vh; margin: 0; text-align: center;
+            margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text);
+            height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
-        h1 { margin: 0; font-size: 32px; letter-spacing: 2px; color: #4ecca3; }
-        #status { margin: 15px 0 40px 0; font-size: 14px; color: #ff4d4d; letter-spacing: 1px; }
-        .power-btn { 
-            background-color: transparent; border: 2px solid #4ecca3; color: #4ecca3;
-            padding: 20px 40px; font-size: 18px; font-weight: bold; border-radius: 12px; 
-            cursor: pointer; transition: 0.2s; letter-spacing: 2px; margin-bottom: 30px;
+        #luxapp-ui {
+            width: 100%; max-width: 400px; height: 100%; background: radial-gradient(circle at top, #1e1e3f 0%, #1a1a2e 100%);
+            padding: 30px 20px; display: flex; flex-direction: column; transition: background 0.8s ease;
         }
-        .power-btn:active { transform: scale(0.95); background-color: rgba(78, 204, 163, 0.1); }
-        .reset-btn {
-            background: none; border: none; color: #666; font-size: 12px; text-decoration: underline; cursor: pointer;
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { margin: 0; font-size: 28px; letter-spacing: 2px; color: var(--accent); font-weight: 300; }
+        #status-bar { font-size: 12px; margin-top: 10px; font-weight: bold; color: #ff4d4d; letter-spacing: 1px; }
+        
+        .lux-control-group { background: rgba(255,255,255,0.03); padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 15px; opacity: 0.6; }
+        
+        .lux-btn-mode {
+            width: 100%; padding: 15px; border: 2px solid var(--accent); background: transparent;
+            color: var(--accent); border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; letter-spacing: 2px; margin-top: 10px;
         }
+        .lux-btn-mode:active { transform: scale(0.95); background: rgba(78, 204, 163, 0.1); }
+        
+        input[type=range] { width: 100%; height: 6px; border-radius: 5px; background: #333; outline: none; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: var(--accent); border-radius: 50%; border: 3px solid var(--bg); box-shadow: 0 0 10px rgba(78, 204, 163, 0.4); }
+        
+        .color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .color-dot { height: 50px; border-radius: 12px; border: none; cursor: pointer; transition: 0.2s; }
+        .color-dot:active { transform: scale(0.9); }
     </style>
 </head>
 <body>
 
-    <h1>LUXLIGHTS</h1>
-    <div id="status">○ Waiting for Key...</div>
-    
-    <button class="power-btn" onclick="toggleLamp()">POWER TOGGLE</button>
-    <button class="reset-btn" onclick="resetKey()">Reset Access Key</button>
+    <div id="luxapp-ui">
+        <div class="header">
+            <h1>LUXLIGHTS</h1>
+            <div id="status-bar">○ Connecting...</div>
+        </div>
+
+        <div id="lux-main-view">
+            <div class="lux-control-group">
+                <label>Brightness</label>
+                <input type="range" id="lux-bri" min="0" max="255" value="128" onchange="luxSetBrightness(this.value)">
+            </div>
+
+            <div class="lux-control-group">
+                <label>Quick Scenes</label>
+                <div class="color-grid">
+                    <button class="color-dot" style="background: #ff4d4d;" onclick="luxSetColor(255,0,0)"></button>
+                    <button class="color-dot" style="background: #4dff88;" onclick="luxSetColor(0,255,0)"></button>
+                    <button class="color-dot" style="background: #4d94ff;" onclick="luxSetColor(0,0,255)"></button>
+                    <button class="color-dot" style="background: #ffcc4d;" onclick="luxSetColor(255,200,0)"></button>
+                </div>
+            </div>
+
+            <button class="lux-btn-mode" onclick="toggleLamp()">POWER TOGGLE</button>
+        </div>
+    </div>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- HARDCODED CREDENTIALS ---
         const MQTT_HOST = "io.adafruit.com";
         const MQTT_PORT = 443;
         const MQTT_USER = "kabeer41";
-        const LAMP_TOPIC = "kabeer41/feeds/luxapp"; // Must match WLED Device Topic exactly
+        const MQTT_PASS = "aio_oosq90ZNIL16i18Ou7YXE2IUvndQ"; 
+        
+        // --- ROUTING ---
+        // Base topic for Power (T) and Brightness (0-255)
+        const LAMP_TOPIC = "kabeer41/feeds/luxapp";
+        // Sub-topic for Colors (#HEX)
+        const COLOR_TOPIC = "kabeer41/feeds/luxapp/col";
 
-        let mqttClient;
-        let MQTT_PASS = localStorage.getItem("lux_key");
+        const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
+        const mqttClient = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
 
-        function initMQTT() {
-            // Securely ask for the key if it isn't saved
-            if (!MQTT_PASS) {
-                MQTT_PASS = prompt("Please enter your NEW Adafruit Access Key:");
-                if (MQTT_PASS) {
-                    localStorage.setItem("lux_key", MQTT_PASS);
-                } else {
-                    document.getElementById('status').innerHTML = "○ Access Key Required";
-                    return;
-                }
+        mqttClient.onConnectionLost = function(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                document.getElementById('status-bar').innerHTML = "○ Disconnected";
+                document.getElementById('status-bar').style.color = "#ff4d4d";
             }
+        };
 
-            document.getElementById('status').innerHTML = "○ Connecting...";
+        mqttClient.connect({
+            useSSL: true, 
+            userName: MQTT_USER, 
+            password: MQTT_PASS,
+            onSuccess: function() {
+                document.getElementById('status-bar').innerHTML = "● CLOUD ACTIVE";
+                document.getElementById('status-bar').style.color = "#4ecca3";
+            },
+            onFailure: function(err) {
+                document.getElementById('status-bar').innerHTML = "○ Connection Failed";
+                console.log("Error:", err);
+            }
+        });
 
-            const clientId = "LuxWeb_" + Math.random().toString(16).substr(2, 5);
-            mqttClient = new Paho.MQTT.Client(MQTT_HOST, MQTT_PORT, clientId);
-
-            mqttClient.onConnectionLost = function(responseObject) {
-                if (responseObject.errorCode !== 0) {
-                    document.getElementById('status').innerHTML = "○ Disconnected";
-                    document.getElementById('status').style.color = "#ff4d4d";
-                }
-            };
-
-            mqttClient.connect({
-                useSSL: true, 
-                userName: MQTT_USER, 
-                password: MQTT_PASS,
-                onSuccess: function() {
-                    document.getElementById('status').innerHTML = "● CONNECTED TO CLOUD";
-                    document.getElementById('status').style.color = "#4ecca3";
-                },
-                onFailure: function(err) {
-                    document.getElementById('status').innerHTML = "○ Connection Failed - Check Key";
-                    document.getElementById('status').style.color = "#ff4d4d";
-                    console.log("Error:", err);
-                    // Clear the bad key so the user can try again
-                    localStorage.removeItem("lux_key");
-                }
-            });
-        }
-
-        function toggleLamp() {
-            if (mqttClient && mqttClient.isConnected()) {
-                // Send plain text "T" directly to the feed
-                const message = new Paho.MQTT.Message("T");
-                message.destinationName = LAMP_TOPIC;
+        // Universal function to send raw text to a specific Adafruit feed
+        function luxPostData(payload, targetTopic) {
+            if (mqttClient.isConnected()) {
+                const message = new Paho.MQTT.Message(payload.toString());
+                message.destinationName = targetTopic;
                 mqttClient.send(message);
             }
         }
 
-        function resetKey() {
-            localStorage.removeItem("lux_key");
-            location.reload();
+        // --- LAMP COMMANDS ---
+        
+        // Send "T" to the base feed
+        function toggleLamp() {
+            luxPostData("T", LAMP_TOPIC);
         }
 
-        // Start connection on load
-        document.addEventListener("DOMContentLoaded", initMQTT);
+        // Send a number (0-255) to the base feed
+        function luxSetBrightness(val) {
+            luxPostData(val, LAMP_TOPIC);
+        }
+
+        // Send a HEX code to the /col sub-feed
+        function luxSetColor(r, g, b) {
+            // Convert the RGB values into a WLED-friendly HEX string (e.g., "#FF0000")
+            const hex = "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase();
+            
+            luxPostData(hex, COLOR_TOPIC);
+            
+            // Give the UI a cool glow effect matching the chosen color
+            document.getElementById("luxapp-ui").style.background = `radial-gradient(circle at top, rgba(${r},${g},${b},0.15) 0%, #1a1a2e 100%)`;
+        }
     </script>
 </body>
 </html>
